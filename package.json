@@ -1,0 +1,14 @@
+{
+    "name": "frgroup-scraper",
+    "version": "1.0.0",
+    "description": "Scraper for frgroup.kz",
+    "main": "scraper.js",
+    "scripts": {
+        "start": "node scraper.js"
+    },
+    "dependencies": {
+        "express": "^5.2.1",
+        "selenium-webdriver": "^4.0.0"
+    },
+    "license": "ISC"
+}
