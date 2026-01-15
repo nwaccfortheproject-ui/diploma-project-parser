@@ -1,4 +1,5 @@
 const { Builder, By, until, Capabilities } = require('selenium-webdriver');
+const chrome = require('selenium-webdriver/chrome');
 const fs = require('fs');
 const path = require('path');
 
@@ -14,10 +15,42 @@ const CONCURRENCY = 1; // Keep 1 to be polite and avoid blocks
 // Utility: Sleep
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Random delay to mimic human behavior
+const randomDelay = (min = 500, max = 1500) => sleep(Math.floor(Math.random() * (max - min + 1)) + min);
+
 async function setupDriver() {
+    const options = new chrome.Options();
+
+    // Anti-detection measures
+    options.addArguments('--disable-blink-features=AutomationControlled');
+    options.addArguments('--disable-dev-shm-usage');
+    options.addArguments('--no-sandbox');
+    options.addArguments('--disable-gpu');
+    options.addArguments('--window-size=1920,1080');
+    options.addArguments('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+    // Exclude automation switches
+    options.excludeSwitches(['enable-automation', 'enable-logging']);
+    options.addArguments('--disable-automation');
+
+    // Set preferences to hide webdriver
+    options.setUserPreferences({
+        'credentials_enable_service': false,
+        'profile.password_manager_enabled': false
+    });
+
     const caps = Capabilities.chrome();
-    caps.setPageLoadStrategy('eager'); // Don't wait for all images to load, just HTML
-    const driver = await new Builder().forBrowser('chrome').withCapabilities(caps).build();
+    caps.setPageLoadStrategy('eager');
+
+    const driver = await new Builder()
+        .forBrowser('chrome')
+        .setChromeOptions(options)
+        .withCapabilities(caps)
+        .build();
+
+    // Remove webdriver flag
+    await driver.executeScript("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
+
     return driver;
 }
 
@@ -45,6 +78,7 @@ async function collectLinks() {
 
             try {
                 await driver.get(url);
+                await randomDelay(400, 1000);
                 await driver.wait(until.elementLocated(By.css('.products-item__link')), 10000);
 
                 const elements = await driver.findElements(By.css('.products-item__link'));
@@ -176,6 +210,9 @@ async function scrapeSingleProduct(driver, url) {
 
         try {
             await driver.get(url);
+
+            // Random delay to mimic human behavior
+            await randomDelay(300, 800);
 
             // Wait for main content
             try {
