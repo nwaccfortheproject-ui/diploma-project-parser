@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { FilterState, ProductsResponse, CategoryNode } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,7 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ChevronRight, ChevronDown, X } from 'lucide-react';
+import { ChevronRight, ChevronDown, X, Search as SearchIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface FilterSidebarProps {
@@ -35,21 +35,58 @@ function getAllDescendants(node: CategoryNode): string[] {
     return descendants;
 }
 
+// Helper to filter category tree
+function filterCategoryTree(nodes: CategoryNode[], query: string): CategoryNode[] {
+    if (!query) return nodes;
+    const lowerQuery = query.toLowerCase();
+
+    return nodes.map(node => {
+        // Check if current node matches
+        const matches = node.name.toLowerCase().includes(lowerQuery);
+
+        // Check children
+        const filteredChildren = filterCategoryTree(node.children || [], query);
+        const hasMatchingChildren = filteredChildren.length > 0;
+
+        // Keep node if it matches OR has matching children
+        if (matches || hasMatchingChildren) {
+            return {
+                ...node,
+                children: filteredChildren // Use filtered children to trim tree
+            };
+        }
+        return null;
+    }).filter(Boolean) as CategoryNode[];
+}
+
 // Recursive Category Component
-function CategoryTreeItem({ node, selected, onToggle, level = 0 }: {
+function CategoryTreeItem({ node, selected, onToggle, level = 0, forceOpen = false }: {
     node: CategoryNode,
     selected: string[],
     onToggle: (v: string, descendants: string[]) => void,
-    level?: number
+    level?: number,
+    forceOpen?: boolean
 }) {
     const isSelected = selected.includes(node.name);
-    // Auto-open if selected or if a descendant is selected (active parent)
+
+    // Memoize descendants calculation to avoid unnecessary re-renders
     const descendants = useMemo(() => getAllDescendants(node), [node]);
-    const hasSelectedDescendant = descendants.some(d => selected.includes(d));
+
+    const hasSelectedDescendant = useMemo(() => {
+        return descendants.some(d => selected.includes(d));
+    }, [descendants, selected]);
+
     const isPartiallyActive = !isSelected && hasSelectedDescendant;
 
-    // Auto open if it has selected descendants so user sees what is selected
-    const [isOpen, setIsOpen] = useState(isSelected || hasSelectedDescendant);
+    // Auto open if it has selected descendants so user sees what is selected OR if search is active (forceOpen)
+    const [isOpen, setIsOpen] = useState(isSelected || hasSelectedDescendant || forceOpen);
+
+    // Sync isOpen when forceOpen changes or selection changes (if deep linking)
+    useEffect(() => {
+        if (forceOpen) setIsOpen(true);
+        if (hasSelectedDescendant) setIsOpen(true);
+    }, [forceOpen, hasSelectedDescendant]);
+
     const hasChildren = node.children && node.children.length > 0;
 
     return (
@@ -58,33 +95,42 @@ function CategoryTreeItem({ node, selected, onToggle, level = 0 }: {
                 className={cn(
                     "flex items-center gap-2 py-1 px-1 rounded transition-colors group",
                     isSelected
-                        ? "bg-blue-50 text-blue-700 font-medium"
+                        ? "bg-blue-100 text-blue-800 font-medium"
                         : isPartiallyActive
-                            ? "bg-blue-50/50" // Lighter highlight for active parent
-                            : "hover:bg-gray-50",
+                            ? "bg-blue-50 text-blue-600" // Highlight for active parent
+                            : "hover:bg-gray-100",
                     level > 0 && "ml-3"
                 )}
             >
                 {hasChildren ? (
-                    <button onClick={() => setIsOpen(!isOpen)} className="p-0.5 hover:bg-gray-200 rounded text-gray-400">
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            setIsOpen(!isOpen);
+                        }}
+                        className="p-1 hover:bg-black/5 rounded text-gray-500 transition-colors"
+                    >
                         {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                     </button>
-                ) : <span className="w-4" />}
+                ) : <span className="w-5" />}
 
-                <Checkbox
-                    id={`cat-${node.name}`}
-                    checked={isSelected}
-                    onCheckedChange={() => onToggle(node.name, descendants)}
-                    className={cn("h-4 w-4", isSelected && "border-blue-500 data-[state=checked]:bg-blue-500")}
-                />
+                <div className="flex items-center gap-2 flex-1 cursor-pointer" onClick={() => onToggle(node.name, descendants)}>
+                    <Checkbox
+                        id={`cat-${node.name}`}
+                        checked={isSelected}
+                        onCheckedChange={() => onToggle(node.name, descendants)}
+                        className={cn("h-4 w-4", isSelected && "border-blue-500 data-[state=checked]:bg-blue-500")}
+                    />
 
-                <Label htmlFor={`cat-${node.name}`} className={cn("text-sm cursor-pointer flex-1 truncate", isSelected && "text-blue-700")}>
-                    {node.name} <span className="text-xs text-gray-400 group-hover:text-gray-500">({node.count})</span>
-                </Label>
+                    <Label htmlFor={`cat-${node.name}`} className={cn("text-sm cursor-pointer flex-1 truncate pointer-events-none", isSelected && "text-blue-700")}>
+                        {node.name} <span className="text-xs text-gray-400 group-hover:text-gray-500">({node.count})</span>
+                    </Label>
+                </div>
             </div>
 
             {hasChildren && isOpen && (
-                <div className="border-l border-gray-100 ml-2">
+                <div className="border-l border-gray-200 ml-2.5 pl-1">
                     {node.children.map(child => (
                         <CategoryTreeItem
                             key={child.name}
@@ -92,6 +138,7 @@ function CategoryTreeItem({ node, selected, onToggle, level = 0 }: {
                             selected={selected}
                             onToggle={onToggle}
                             level={level + 1}
+                            forceOpen={forceOpen}
                         />
                     ))}
                 </div>
@@ -103,6 +150,10 @@ function CategoryTreeItem({ node, selected, onToggle, level = 0 }: {
 export function FilterSidebar({ facets, filters, onChange, className }: FilterSidebarProps) {
     const [priceRange, setPriceRange] = useState([0, 1000000]);
 
+    // Local search states
+    const [brandQuery, setBrandQuery] = useState('');
+    const [categoryQuery, setCategoryQuery] = useState('');
+
     useEffect(() => {
         const min = filters.minPrice !== null ? filters.minPrice : facets.minPrice;
         const max = filters.maxPrice !== null ? filters.maxPrice : facets.maxPrice;
@@ -110,6 +161,7 @@ export function FilterSidebar({ facets, filters, onChange, className }: FilterSi
             setPriceRange([min, max]);
         }
     }, [facets.minPrice, facets.maxPrice, filters.minPrice, filters.maxPrice]);
+
 
     const handlePriceChange = (val: number[]) => {
         setPriceRange(val);
@@ -139,7 +191,6 @@ export function FilterSidebar({ facets, filters, onChange, className }: FilterSi
             newValues = current.filter(v => !toRemove.has(v));
         } else {
             // Check: Add self AND all descendants
-            // We use Set to avoid duplicates
             const toAdd = new Set([...current, value, ...descendants]);
             newValues = Array.from(toAdd);
         }
@@ -147,6 +198,8 @@ export function FilterSidebar({ facets, filters, onChange, className }: FilterSi
     };
 
     const resetFilters = () => {
+        setBrandQuery('');
+        setCategoryQuery('');
         onChange({
             search: filters.search,
             gender: [],
@@ -176,25 +229,48 @@ export function FilterSidebar({ facets, filters, onChange, className }: FilterSi
         });
     };
 
-    // Helper to get chips, hiding children if parent is selected
-    // Changed to return CategoryNode[] to have direct access to descendants in the UI loop
-    const getVisibleCategoryChips = (nodes: CategoryNode[], selected: string[]): CategoryNode[] => {
+    // Filtered Facets based on local search
+    const filteredBrands = useMemo(() =>
+        sortWithSelected(
+            facets.brands.filter(b => b.toLowerCase().includes(brandQuery.toLowerCase())),
+            filters.brands
+        ),
+        [facets.brands, brandQuery, filters.brands]);
+
+    const filteredCategories = useMemo(() =>
+        filterCategoryTree(facets.categories, categoryQuery),
+        [facets.categories, categoryQuery]);
+
+
+    // Helper to get cards, hiding children if parent is selected
+    // Note: We use facets.categories (Full Tree) instead of filteredCategories to ensure chips are always stable
+    const getVisibleCategoryChips = (nodes: CategoryNode[], selected: string[], seen: Set<string> = new Set()): CategoryNode[] => {
         let chips: CategoryNode[] = [];
+
         for (const node of nodes) {
+            // If this node is selected
             if (selected.includes(node.name)) {
-                // If parent is selected, add ONLY parent, and do NOT recurse (hide children chips)
-                chips.push(node);
+                // Add it if unique
+                if (!seen.has(node.name)) {
+                    chips.push(node);
+                    seen.add(node.name);
+                }
+                // IMPORTANT: If parent is selected, we assume it covers all children, so we DO NOT recurse.
+                // This hides the child chips.
             } else {
-                // If parent NOT selected, recurse children
+                // If not selected, we MUST recurse to check for selected children
                 if (node.children && node.children.length > 0) {
-                    chips.push(...getVisibleCategoryChips(node.children, selected));
+                    chips.push(...getVisibleCategoryChips(node.children, selected, seen));
                 }
             }
         }
         return chips;
     };
 
-    const visibleCategoryChips = getVisibleCategoryChips(facets.categories, filters.categories);
+    // Ensure we are working with the full data for chips logic
+    const visibleCategoryChips = useMemo(() =>
+        getVisibleCategoryChips(facets.categories, filters.categories),
+        [facets.categories, filters.categories]);
 
     return (
         <div className={className}>
@@ -202,7 +278,7 @@ export function FilterSidebar({ facets, filters, onChange, className }: FilterSi
                 <h3 className="font-semibold text-lg">Filters</h3>
                 {hasActiveFilters && (
                     <Button variant="ghost" size="sm" onClick={resetFilters} className="h-8 text-red-500 hover:text-red-700 hover:bg-red-50">
-                        Reset
+                        Reset All
                     </Button>
                 )}
             </div>
@@ -211,9 +287,24 @@ export function FilterSidebar({ facets, filters, onChange, className }: FilterSi
 
                 {/* Price */}
                 <AccordionItem value="price">
-                    <AccordionTrigger>Price (₸)</AccordionTrigger>
+                    <AccordionTrigger className="hover:no-underline">
+                        <span className="flex-1 text-left">Price (₸)</span>
+                    </AccordionTrigger>
                     <AccordionContent>
-                        <div className="px-2 pt-4 pb-2">
+                        <div className="flex justify-between items-center mb-2 px-1">
+                            <span className="text-xs text-muted-foreground">Range</span>
+                            {(filters.minPrice !== null || filters.maxPrice !== null) && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 px-2 text-[10px] text-muted-foreground hover:text-red-500"
+                                    onClick={() => onChange({ ...filters, minPrice: null, maxPrice: null })}
+                                >
+                                    Reset
+                                </Button>
+                            )}
+                        </div>
+                        <div className="px-2 pt-2 pb-2">
                             <Slider
                                 defaultValue={[facets.minPrice, facets.maxPrice]}
                                 value={priceRange}
@@ -245,14 +336,38 @@ export function FilterSidebar({ facets, filters, onChange, className }: FilterSi
 
                 {/* Gender */}
                 <AccordionItem value="gender">
-                    <AccordionTrigger>Gender</AccordionTrigger>
+                    <AccordionTrigger className="hover:no-underline">
+                        <span className="flex-1 text-left">Gender</span>
+                    </AccordionTrigger>
                     <AccordionContent>
-                        {/* Mini Cards (Chips) for selected */}
+                        <div className="flex justify-between items-center mb-2 px-1">
+                            <span className="text-xs text-muted-foreground">Select</span>
+                            {filters.gender.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 px-2 text-[10px] text-muted-foreground hover:text-red-500"
+                                    onClick={() => onChange({ ...filters, gender: [] })}
+                                >
+                                    Clear
+                                </Button>
+                            )}
+                        </div>
                         {filters.gender.length > 0 && (
                             <div className="flex flex-wrap gap-1 mb-2">
                                 {filters.gender.map(g => (
-                                    <Badge key={g} variant="secondary" className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200">
-                                        {g} <X className="ml-1 h-3 w-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleFilter('gender', g); }} />
+                                    <Badge key={g} variant="secondary" className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200">
+                                        {g}
+                                        <button
+                                            type="button"
+                                            className="ml-1 hover:text-red-500 focus:outline-none"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleFilter('gender', g);
+                                            }}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
                                     </Badge>
                                 ))}
                             </div>
@@ -277,32 +392,82 @@ export function FilterSidebar({ facets, filters, onChange, className }: FilterSi
 
                 {/* Categories */}
                 <AccordionItem value="category">
-                    <AccordionTrigger>Category</AccordionTrigger>
+                    <AccordionTrigger className="hover:no-underline">
+                        <span className="flex-1 text-left">Category</span>
+                    </AccordionTrigger>
                     <AccordionContent>
+                        <div className="flex justify-between items-center mb-2 px-1">
+                            {/* Search Input for Category */}
+                            <div className="relative flex-1 mr-2">
+                                <SearchIcon className="absolute left-2 top-1.5 h-3 w-3 text-gray-400" />
+                                <Input
+                                    placeholder="Search categories..."
+                                    value={categoryQuery}
+                                    onChange={(e) => setCategoryQuery(e.target.value)}
+                                    className="h-7 text-xs pl-7 pr-6"
+                                />
+                                {categoryQuery && (
+                                    <button
+                                        type="button"
+                                        className="absolute right-2 top-1.5 text-gray-400 cursor-pointer hover:text-gray-600 focus:outline-none"
+                                        onClick={() => setCategoryQuery('')}
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                )}
+                            </div>
+
+                            {filters.categories.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 px-2 text-[10px] text-muted-foreground hover:text-red-500"
+                                    onClick={() => onChange({ ...filters, categories: [] })}
+                                >
+                                    Clear
+                                </Button>
+                            )}
+                        </div>
+
+                        {/* Chips for Selected Categories */}
                         {visibleCategoryChips.length > 0 && (
                             <div className="flex flex-wrap gap-1 mb-2">
                                 {visibleCategoryChips.map(node => (
-                                    <Badge key={node.name} variant="secondary" className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200">
-                                        {node.name} <X className="ml-1 h-3 w-3 cursor-pointer" onClick={(e) => {
-                                            e.stopPropagation();
-                                            // Direct access to node and descendants! Robust!
-                                            const descendants = getAllDescendants(node);
-                                            toggleCategory(node.name, descendants);
-                                        }} />
+                                    <Badge key={node.name} variant="secondary" className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200">
+                                        {node.name}
+                                        <button
+                                            type="button"
+                                            className="ml-1 hover:text-red-500 focus:outline-none"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                // We must simply remove this node and all its descendants. 
+                                                // Descendants are derived from the node object itself.
+                                                const descendants = getAllDescendants(node);
+                                                toggleCategory(node.name, descendants);
+                                            }}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
                                     </Badge>
                                 ))}
                             </div>
                         )}
+
                         <ScrollArea className="h-72 pr-2">
                             <div className="space-y-1">
-                                {facets.categories.map((node) => (
-                                    <CategoryTreeItem
-                                        key={node.name}
-                                        node={node}
-                                        selected={filters.categories}
-                                        onToggle={toggleCategory}
-                                    />
-                                ))}
+                                {filteredCategories.length > 0 ? (
+                                    filteredCategories.map((node) => (
+                                        <CategoryTreeItem
+                                            key={node.name}
+                                            node={node}
+                                            selected={filters.categories}
+                                            onToggle={toggleCategory}
+                                            forceOpen={categoryQuery.length > 0} // Open tree when searching
+                                        />
+                                    ))
+                                ) : (
+                                    <div className="text-xs text-gray-500 text-center py-4">No categories found</div>
+                                )}
                             </div>
                         </ScrollArea>
                     </AccordionContent>
@@ -310,35 +475,81 @@ export function FilterSidebar({ facets, filters, onChange, className }: FilterSi
 
                 {/* Brand */}
                 <AccordionItem value="brand">
-                    <AccordionTrigger>Brand</AccordionTrigger>
+                    <AccordionTrigger className="hover:no-underline">
+                        <span className="flex-1 text-left">Brand</span>
+                    </AccordionTrigger>
                     <AccordionContent>
+                        <div className="flex justify-between items-center mb-2 px-1">
+                            <div className="relative flex-1 mr-2">
+                                <SearchIcon className="absolute left-2 top-1.5 h-3 w-3 text-gray-400" />
+                                <Input
+                                    placeholder="Search brands..."
+                                    value={brandQuery}
+                                    onChange={(e) => setBrandQuery(e.target.value)}
+                                    className="h-7 text-xs pl-7 pr-6"
+                                />
+                                {brandQuery && (
+                                    <button
+                                        type="button"
+                                        className="absolute right-2 top-1.5 text-gray-400 cursor-pointer hover:text-gray-600 focus:outline-none"
+                                        onClick={() => setBrandQuery('')}
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                )}
+                            </div>
+
+                            {(filters.brands.length > 0) && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 px-2 text-[10px] text-muted-foreground hover:text-red-500"
+                                    onClick={() => onChange({ ...filters, brands: [] })}
+                                >
+                                    Clear
+                                </Button>
+                            )}
+                        </div>
+
                         {filters.brands.length > 0 && (
                             <div className="flex flex-wrap gap-1 mb-2">
                                 {filters.brands.map(b => (
-                                    <Badge key={b} variant="secondary" className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200">
-                                        {b} <X className="ml-1 h-3 w-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleFilter('brands', b); }} />
+                                    <Badge key={b} variant="secondary" className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200">
+                                        {b}
+                                        <button
+                                            type="button"
+                                            className="ml-1 hover:text-red-500 focus:outline-none"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleFilter('brands', b);
+                                            }}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
                                     </Badge>
                                 ))}
                             </div>
                         )}
-                        <div className="mb-2">
-                            <Input placeholder="Search brands..." className="h-7 text-xs" />
-                        </div>
+
                         <ScrollArea className="h-[200px] pr-4">
                             <div className="space-y-2">
-                                {sortWithSelected(facets.brands, filters.brands).map((b) => {
-                                    const isSelected = filters.brands.includes(b);
-                                    return (
-                                        <div key={b} className={cn("flex items-center space-x-2 p-1 rounded", isSelected ? "bg-blue-50" : "")}>
-                                            <Checkbox
-                                                id={`b-${b}`}
-                                                checked={isSelected}
-                                                onCheckedChange={() => toggleFilter('brands', b)}
-                                            />
-                                            <Label htmlFor={`b-${b}`} className={cn("text-sm cursor-pointer", isSelected && "text-blue-700 font-medium")}>{b}</Label>
-                                        </div>
-                                    );
-                                })}
+                                {filteredBrands.length > 0 ? (
+                                    filteredBrands.map((b) => {
+                                        const isSelected = filters.brands.includes(b);
+                                        return (
+                                            <div key={b} className={cn("flex items-center space-x-2 p-1 rounded", isSelected ? "bg-blue-50" : "")}>
+                                                <Checkbox
+                                                    id={`b-${b}`}
+                                                    checked={isSelected}
+                                                    onCheckedChange={() => toggleFilter('brands', b)}
+                                                />
+                                                <Label htmlFor={`b-${b}`} className={cn("text-sm cursor-pointer", isSelected && "text-blue-700 font-medium")}>{b}</Label>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="text-xs text-gray-500 text-center py-4">No brands found</div>
+                                )}
                             </div>
                         </ScrollArea>
                     </AccordionContent>
@@ -346,13 +557,38 @@ export function FilterSidebar({ facets, filters, onChange, className }: FilterSi
 
                 {/* Sizes */}
                 <AccordionItem value="size">
-                    <AccordionTrigger>Size</AccordionTrigger>
+                    <AccordionTrigger className="hover:no-underline">
+                        <span className="flex-1 text-left">Size</span>
+                    </AccordionTrigger>
                     <AccordionContent>
+                        <div className="flex justify-between items-center mb-2 px-1">
+                            <span className="text-xs text-muted-foreground">Select</span>
+                            {filters.sizes.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 px-2 text-[10px] text-muted-foreground hover:text-red-500"
+                                    onClick={() => onChange({ ...filters, sizes: [] })}
+                                >
+                                    Clear
+                                </Button>
+                            )}
+                        </div>
                         {filters.sizes.length > 0 && (
                             <div className="flex flex-wrap gap-1 mb-2">
                                 {filters.sizes.map(s => (
-                                    <Badge key={s} variant="secondary" className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200">
-                                        {s} <X className="ml-1 h-3 w-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleFilter('sizes', s); }} />
+                                    <Badge key={s} variant="secondary" className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200">
+                                        {s}
+                                        <button
+                                            type="button"
+                                            className="ml-1 hover:text-red-500 focus:outline-none"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleFilter('sizes', s);
+                                            }}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
                                     </Badge>
                                 ))}
                             </div>

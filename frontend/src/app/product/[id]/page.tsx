@@ -7,6 +7,7 @@ import { ProductGallery } from '@/components/product-gallery';
 import { Product } from '@/types';
 import fs from 'fs';
 import path from 'path';
+import { ProductActions } from '@/components/product/product-actions';
 
 // This is a simplified way to fetch a single product from the JSON file.
 // In a real app, you would use a database or an API client.
@@ -71,6 +72,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                             )}
                         </div>
 
+
+
                         {/* Sizes */}
                         {product.sizes.length > 0 && (
                             <div className="mb-8">
@@ -85,16 +88,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                             </div>
                         )}
 
-                        <div className="space-y-4 mb-8">
-                            <Button className="w-full h-12 text-lg">
-                                Add to Cart
-                            </Button>
-                            <Button variant="outline" className="w-full h-12 text-lg" asChild>
-                                <a href={product.url} target="_blank" rel="noopener noreferrer">
-                                    View on Store
-                                </a>
-                            </Button>
-                        </div>
+                        <ProductActions product={product} />
 
                         {/* Description */}
                         <div className="prose prose-sm text-gray-600">

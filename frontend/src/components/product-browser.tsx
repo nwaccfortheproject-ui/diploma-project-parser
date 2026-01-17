@@ -6,7 +6,7 @@ import { ProductCard } from '@/components/item-card';
 import { FilterSidebar } from '@/components/filter-sidebar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     Pagination,
@@ -185,7 +185,8 @@ export function ProductBrowser() {
                                     <Filter className="h-4 w-4" />
                                 </Button>
                             </SheetTrigger>
-                            <SheetContent side="left" className="w-[300px] overflow-y-auto">
+                            <SheetContent side="left" className="w-[300px] overflow-y-auto p-4">
+                                <SheetTitle className="sr-only">Filters</SheetTitle>
                                 <h2 className="text-lg font-semibold mb-4">Filters</h2>
                                 {data && (
                                     <FilterSidebar

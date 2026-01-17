@@ -18,37 +18,53 @@ export function ProductCard({ product }: ProductCardProps) {
 
     return (
         <Card className="group border-none shadow-none bg-transparent">
-            <Link href={`/product/${product.id}`} className="block relative aspect-[3/4] overflow-hidden rounded-xl bg-gray-100 mb-3">
-                {/* Badges */}
-                {hasDiscount && (
-                    <Badge className="absolute top-2 left-2 z-10 bg-red-600/90 text-white border-0 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm shadow-sm">
-                        Sale
-                    </Badge>
-                )}
+            {/* Draggable Wrapper */}
+            <div
+                draggable
+                onDragStart={(e) => {
+                    const data = {
+                        id: product.id,
+                        title: product.title,
+                        brand: product.brand,
+                        image: primaryImage
+                    };
+                    e.dataTransfer.setData('application/json', JSON.stringify(data));
+                    e.dataTransfer.effectAllowed = 'copy';
+                }}
+                className="cursor-grab active:cursor-grabbing"
+            >
+                <Link href={`/product/${product.id}`} className="block relative aspect-[3/4] overflow-hidden rounded-xl bg-gray-100 mb-3">
+                    {/* Badges */}
+                    {hasDiscount && (
+                        <Badge className="absolute top-2 left-2 z-10 bg-red-600/90 text-white border-0 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm shadow-sm">
+                            Sale
+                        </Badge>
+                    )}
 
-                {/* Images with Hoover Effect */}
-                <div className="w-full h-full relative">
-                    {/* Primary Image */}
-                    <Image
-                        src={primaryImage}
-                        alt={product.title || 'Product Image'}
-                        fill
-                        className="object-cover object-top transition-all duration-500 ease-in-out group-hover:scale-105 group-hover:opacity-0"
-                        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                    />
-                    {/* Secondary Image (Reveal on Hover) */}
-                    <Image
-                        src={secondaryImage}
-                        alt={product.title || 'Product Image'}
-                        fill
-                        className="object-cover object-top absolute inset-0 opacity-0 transition-all duration-500 ease-in-out group-hover:opacity-100 group-hover:scale-105"
-                        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                    />
+                    {/* Images with Hoover Effect */}
+                    <div className="w-full h-full relative">
+                        {/* Primary Image */}
+                        <Image
+                            src={primaryImage}
+                            alt={product.title || 'Product Image'}
+                            fill
+                            className="object-cover object-top transition-all duration-500 ease-in-out group-hover:scale-105 group-hover:opacity-0"
+                            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                        />
+                        {/* Secondary Image (Reveal on Hover) */}
+                        <Image
+                            src={secondaryImage}
+                            alt={product.title || 'Product Image'}
+                            fill
+                            className="object-cover object-top absolute inset-0 opacity-0 transition-all duration-500 ease-in-out group-hover:opacity-100 group-hover:scale-105"
+                            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                        />
 
-                    {/* Dark Overlay on Hover (Optional, adds contrast if needed) */}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
-                </div>
-            </Link>
+                        {/* Dark Overlay on Hover (Optional, adds contrast if needed) */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
+                    </div>
+                </Link>
+            </div>
 
             <CardContent className="px-1 py-0 space-y-1">
                 {/* Brand */}
