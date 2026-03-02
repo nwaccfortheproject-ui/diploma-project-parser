@@ -12,7 +12,7 @@ export default function Home() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 font-bold text-xl tracking-tighter">
             <ShoppingBag className="h-6 w-6 text-blue-600" />
-            <span>LUXE.STORE</span>
+            <span>SmartBuy</span>
           </div>
           <nav className="hidden md:flex gap-6 text-sm font-medium text-gray-600">
             <Link href="/products" className="hover:text-blue-600 transition-colors">Мужское</Link>
@@ -104,7 +104,7 @@ export default function Home() {
         {/* Simple Footer */}
         <footer className="bg-gray-900 text-gray-400 py-12 border-t border-gray-800">
           <div className="container mx-auto px-4 text-center">
-            <p>&copy; 2026 Luxe.Store. All rights reserved.</p>
+            <p>&copy; 2026 SmartBuy. All rights reserved.</p>
           </div>
         </footer>
 
