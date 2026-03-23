@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SmartBuy",
-  description: "SmartBuy - Premium Brands and Latest Trends",
+  title: "SMARTBUY",
+  description: "SMARTBUY - Premium Brands and Latest Trends",
 };
 
 import { StylistProvider } from "@/context/style-context";
