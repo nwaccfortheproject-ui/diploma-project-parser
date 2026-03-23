@@ -1,47 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-import { Product, ProductsResponse } from '@/types';
-
-// Load data once in memory (serverless warm start cache)
-let PRODUCTS_CACHE: Product[] | null = null;
-
-function getProducts(): Product[] {
-    if (PRODUCTS_CACHE) return PRODUCTS_CACHE;
-    try {
-        const filePath = path.join(process.cwd(), 'src/data/products.json');
-        const fileContents = fs.readFileSync(filePath, 'utf8');
-        PRODUCTS_CACHE = JSON.parse(fileContents);
-        // Normalize prices for sorting/filtering and Generate IDs
-        PRODUCTS_CACHE?.forEach(p => {
-            // Generate a consistent ID from the unique URL
-            // Simple hash or encoding since we don't have crypto in Edge/Browser same way, 
-            // but this is Node environment.
-            let hash = 0;
-            for (let i = 0; i < p.url.length; i++) {
-                const char = p.url.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash; // Convert to 32bit integer
-            }
-            const hexId = Math.abs(hash).toString(16);
-            (p as any).id = hexId;
-
-            const price = p.discount_price || p.price;
-            (p as any)._parsedPrice = parsePrice(price);
-        });
-        return PRODUCTS_CACHE || [];
-    } catch (e) {
-        console.error('Failed to load products', e);
-        return [];
-    }
-}
-
-function parsePrice(priceStr: string | null): number {
-    if (!priceStr) return 0;
-    // Remove non-numeric characters except digits
-    const numericMap = priceStr.replace(/[^\d]/g, '');
-    return parseInt(numericMap) || 0;
-}
+import connectToDatabase from '@/lib/db';
+import Product from '@/models/Product';
 
 interface CategoryNode {
     name: string;
@@ -49,12 +8,12 @@ interface CategoryNode {
     children: Map<string, CategoryNode>;
 }
 
-function buildCategoryTree(products: Product[]): any[] {
+function buildCategoryTree(products: any[]): any[] {
     const root = new Map<string, CategoryNode>();
 
     products.forEach(p => {
         let currentLevel = root;
-        p.categories.forEach((catName) => {
+        (p.categories || []).forEach((catName: string) => {
             if (!currentLevel.has(catName)) {
                 currentLevel.set(catName, { name: catName, count: 0, children: new Map() });
             }
@@ -64,7 +23,6 @@ function buildCategoryTree(products: Product[]): any[] {
         });
     });
 
-    // Helper to convert Map to Array recursively
     const mapToArray = (map: Map<string, CategoryNode>): any[] => {
         return Array.from(map.values()).map(node => ({
             name: node.name,
@@ -77,84 +35,83 @@ function buildCategoryTree(products: Product[]): any[] {
 }
 
 export async function GET(request: NextRequest) {
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const search = searchParams.get('search')?.toLowerCase() || '';
+    try {
+        await connectToDatabase();
+        
+        const { searchParams } = new URL(request.url);
+        const page = parseInt(searchParams.get('page') || '1');
+        const limit = parseInt(searchParams.get('limit') || '20');
+        const search = searchParams.get('search')?.toLowerCase() || '';
 
-    // Filters
-    const genders = searchParams.getAll('gender');
-    const categories = searchParams.getAll('category');
-    const brands = searchParams.getAll('brand');
-    const sizes = searchParams.getAll('size');
-    const minPrice = searchParams.get('minPrice') ? parseInt(searchParams.get('minPrice')!) : null;
-    const maxPrice = searchParams.get('maxPrice') ? parseInt(searchParams.get('maxPrice')!) : null;
+        // Filters
+        const genders = searchParams.getAll('gender');
+        const categories = searchParams.getAll('category');
+        const brands = searchParams.getAll('brand');
+        const sizes = searchParams.getAll('size');
+        const minPrice = searchParams.get('minPrice') ? parseInt(searchParams.get('minPrice')!) : null;
+        const maxPrice = searchParams.get('maxPrice') ? parseInt(searchParams.get('maxPrice')!) : null;
 
-    let products = getProducts();
+        let query: any = {};
+        if (search) {
+            query.$or = [
+                { title: { $regex: search, $options: 'i' } },
+                { brand: { $regex: search, $options: 'i' } },
+                { article: { $regex: search, $options: 'i' } }
+            ];
+        }
 
-    // 1. Base Filter (Search Only) - Facets will be based on this to remain stable
-    let searchBase = products;
-    if (search) {
-        searchBase = products.filter(p => {
-            const titleMatch = p.title?.toLowerCase().includes(search);
-            const brandMatch = p.brand?.toLowerCase().includes(search);
-            const articulMatch = p.article?.toLowerCase().includes(search);
-            return titleMatch || brandMatch || articulMatch;
+        // 1. Fetch entire query base for stable facets (only select needed fields for speed)
+        const searchBase = await Product.find(query)
+            .select('brand gender categories sizes parsedPrice')
+            .lean();
+
+        // 2. Compute Facets
+        const facets = {
+            brands: Array.from(new Set(searchBase.map(p => p.brand).filter(Boolean) as string[])).sort(),
+            categories: buildCategoryTree(searchBase),
+            genders: Array.from(new Set(searchBase.map(p => p.gender).filter(Boolean) as string[])).sort(),
+            sizes: Array.from(new Set(searchBase.flatMap(p => p.sizes || []))).sort(),
+            minPrice: searchBase.length ? Math.min(...searchBase.map(p => p.parsedPrice || 0)) : 0,
+            maxPrice: searchBase.length ? Math.max(...searchBase.map(p => p.parsedPrice || 0)) : 0,
+        };
+
+        // 3. Add detailed filters to query
+        if (genders.length > 0) query.gender = { $in: genders };
+        if (categories.length > 0) query.categories = { $in: categories };
+        if (brands.length > 0) query.brand = { $in: brands };
+        if (sizes.length > 0) query.sizes = { $in: sizes };
+        
+        if (minPrice !== null || maxPrice !== null) {
+            query.parsedPrice = {};
+            if (minPrice !== null) query.parsedPrice.$gte = minPrice;
+            if (maxPrice !== null) query.parsedPrice.$lte = maxPrice;
+        }
+
+        const total = await Product.countDocuments(query);
+        const start = (page - 1) * limit;
+        
+        const paginated = await Product.find(query)
+            .skip(start)
+            .limit(limit)
+            .lean();
+
+        // Convert _id to id for backwards compatibility with the UI
+        const items = paginated.map(p => {
+            const temp = { ...p, id: p._id.toString() } as any;
+            delete temp._id;
+            delete temp.__v;
+            return temp;
         });
+
+        return NextResponse.json({
+            items,
+            total,
+            page,
+            limit,
+            facets
+        });
+    } catch (err: any) {
+        console.error("Products API error:", err);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
-
-    // 2. Calculate Facets from Search Base (Stable logic)
-    const facets = {
-        brands: Array.from(new Set(searchBase.map(p => p.brand).filter(Boolean) as string[])).sort(),
-        categories: buildCategoryTree(searchBase),
-        genders: Array.from(new Set(searchBase.map(p => p.gender).filter(Boolean) as string[])).sort(),
-        sizes: Array.from(new Set(searchBase.flatMap(p => p.sizes))).sort(),
-        minPrice: searchBase.length ? Math.min(...searchBase.map(p => (p as any)._parsedPrice)) : 0,
-        maxPrice: searchBase.length ? Math.max(...searchBase.map(p => (p as any)._parsedPrice)) : 0,
-    };
-
-    // 3. Apply Detailed Filters for Products List
-    let filtered = searchBase.filter(p => {
-        // Gender
-        if (genders.length > 0) {
-            if (!p.gender || !genders.includes(p.gender)) return false;
-        }
-
-        // Category
-        if (categories.length > 0) {
-            const hasCat = p.categories.some(cat => categories.includes(cat));
-            if (!hasCat) return false;
-        }
-
-        // Brand
-        if (brands.length > 0) {
-            if (!p.brand || !brands.includes(p.brand)) return false;
-        }
-
-        // Size
-        if (sizes.length > 0) {
-            const hasSize = p.sizes.some(s => sizes.includes(s));
-            if (!hasSize) return false;
-        }
-
-        // Price
-        const price = (p as any)._parsedPrice;
-        if (minPrice !== null && price < minPrice) return false;
-        if (maxPrice !== null && price > maxPrice) return false;
-
-        return true;
-    });
-
-    // 3. Paginate
-    const total = filtered.length;
-    const start = (page - 1) * limit;
-    const paginated = filtered.slice(start, start + limit);
-
-    return NextResponse.json({
-        items: paginated,
-        total,
-        page,
-        limit,
-        facets
-    });
 }

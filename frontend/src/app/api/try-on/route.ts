@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import cloudinary from '@/lib/cloudinary';
 
 // Initialize GoogleGenAI client (New SDK)
 const genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY });
@@ -92,9 +93,19 @@ export async function POST(req: Request) {
             }
 
             if (generatedImageBase64) {
+                let finalImageUrl = `data:image/jpeg;base64,${generatedImageBase64}`;
+                try {
+                    const uploadRes = await cloudinary.uploader.upload(finalImageUrl, {
+                        folder: "smartbuy_tryon"
+                    });
+                    finalImageUrl = uploadRes.secure_url;
+                } catch(e) {
+                    console.error("Cloudinary upload failed, falling back to base64", e);
+                }
+
                 return Response.json({
                     type: 'image',
-                    result: generatedImageBase64,
+                    result: finalImageUrl,
                     advice: generatedText
                 });
             } else {

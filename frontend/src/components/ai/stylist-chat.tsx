@@ -10,6 +10,8 @@ import { ChatMessage } from './chat-message';
 import { VirtualTryOn } from './virtual-try-on';
 import { useStylist } from '@/context/style-context';
 import { Progress } from "@/components/ui/progress";
+import { useSession } from 'next-auth/react';
+import { AuthDialog } from '../auth/auth-dialog';
 
 export function StylistChat() {
 
@@ -20,6 +22,9 @@ export function StylistChat() {
         lastGeneratedImage, setLastGeneratedImage,
         isGenerating, generationProgress
     } = useStylist();
+
+    const { data: session } = useSession();
+    const [authDialogOpen, setAuthDialogOpen] = useState(false);
 
     const [isExpanded, setIsExpanded] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -32,6 +37,22 @@ export function StylistChat() {
     }) as any;
 
     const isLoading = status === 'submitted' || status === 'streaming';
+    const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
+
+    // Initial load of history
+    useEffect(() => {
+        if (session && isChatOpen && !hasLoadedHistory) {
+            setHasLoadedHistory(true);
+            fetch('/api/chat/history')
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data) && data.length > 0) {
+                        setMessages(data);
+                    }
+                })
+                .catch(err => console.error("Failed to load chat history", err));
+        }
+    }, [session, isChatOpen, hasLoadedHistory, setMessages]);
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -44,14 +65,27 @@ export function StylistChat() {
     useEffect(() => {
         if (lastGeneratedImage) {
 
+            const contentStr = `Вот как вы выглядите в ${currentTryOnProduct?.title || 'item'}!\n\n:::IMAGE_DATA:::${lastGeneratedImage}`;
+
             const newMessage: any = {
                 id: Date.now().toString(),
                 role: 'assistant',
-                content: `Вот как вы выглядите в ${currentTryOnProduct?.title || 'item'}!\n\n:::IMAGE_DATA:::${lastGeneratedImage}`,
+                content: contentStr,
                 createdAt: new Date(),
             };
 
             setMessages((prev: any[]) => [...prev, newMessage]);
+
+            // Save to DB
+            fetch('/api/chat/save-message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    role: 'assistant',
+                    content: contentStr,
+                    images: [lastGeneratedImage] 
+                })
+            }).catch(console.error);
 
             // Clear it so we don't duplicate
             setLastGeneratedImage(null);
@@ -82,7 +116,13 @@ export function StylistChat() {
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDraggingOver(true);
-        if (!isChatOpen) toggleChat(); // Auto-open on drag hover
+        if (!isChatOpen) {
+            if (!session) {
+                setAuthDialogOpen(true);
+            } else {
+                toggleChat();
+            }
+        }
     };
 
     const handleDragLeave = (e: React.DragEvent) => {
@@ -228,12 +268,20 @@ export function StylistChat() {
                     animate={{ scale: 1 }}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    onClick={toggleChat}
+                    onClick={() => {
+                        if (!session) {
+                            setAuthDialogOpen(true);
+                        } else {
+                            toggleChat();
+                        }
+                    }}
                     className="fixed z-50 bottom-10 right-10 w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full shadow-xl flex items-center justify-center text-white cursor-pointer"
                 >
                     <Sparkles className="h-8 w-8" />
                 </motion.button>
             )}
+
+            <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
         </>
     );
 }

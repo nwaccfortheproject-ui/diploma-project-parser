@@ -3,6 +3,11 @@ import { streamText, tool } from 'ai';
 import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../auth/[...nextauth]/route';
+import connectToDatabase from '@/lib/db';
+import Chat from '@/models/Chat';
+import Product from '@/models/Product';
 
 // --- Configuration ---
 // In production, use process.env.GEMINI_API_KEY
@@ -13,55 +18,47 @@ const google = createGoogleGenerativeAI({
 
 export const maxDuration = 30; // 30 seconds max duration
 
-// --- Helper: Load Products for Context ---
-// We cache this so we don't read the file on every request
-let productContextCache: string | null = null;
+// --- Product Context is now fetched directly inside POST ---
 
-function getProductContext() {
-    if (productContextCache) return productContextCache;
+export async function POST(req: Request) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+        return new Response('Unauthorized', { status: 401 });
+    }
+
+    const { messages } = await req.json();
 
     try {
-        const filePath = path.join(process.cwd(), '../products.json'); // Adjust path if needed relative to where next runs
-
-        // Fallback logic to find the file
-        let finalPath = '';
-        if (fs.existsSync(path.join(process.cwd(), 'products.json'))) {
-            finalPath = path.join(process.cwd(), 'products.json');
-        } else if (fs.existsSync(path.join(process.cwd(), '../products.json'))) {
-            finalPath = path.join(process.cwd(), '../products.json');
-        } else {
-            console.error("Could not find products.json");
-            return "No products available.";
+        await connectToDatabase();
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.role === 'user') {
+            await Chat.create({
+                userId: (session.user as any).id,
+                role: 'user',
+                content: lastMsg.content
+            });
         }
+    } catch(e) { console.error("Error saving user message", e); }
 
-        const fileContent = fs.readFileSync(finalPath, 'utf-8');
-        const allProducts = JSON.parse(fileContent);
-
-        // Map ALL products to a minimal format to fit in context
-        // We strip descriptions and other heavy fields to save space
-        const minimized = allProducts.map((p: any) => ({
-            id: p.id || p.article || p.url.split('/').pop(),
+    let productContext = "No products loaded.";
+    try {
+        const topProducts = await Product.find({})
+            .sort({ _id: -1 })
+            .limit(1000)
+            .select('article _id title brand categories parsedPrice url images')
+            .lean();
+            
+        const minimized = topProducts.map((p: any) => ({
+            id: p.article || p._id.toString(),
             title: p.title,
             brand: p.brand,
             category: Array.isArray(p.categories) ? p.categories.join(' > ') : p.categories,
-            price: p.final_price || p.price,
+            price: p.parsedPrice,
             link: p.url,
             image: p.images?.[0] || ''
         }));
-
-        productContextCache = JSON.stringify(minimized);
-        console.log(`Loaded ${minimized.length} products into context.`);
-        return productContextCache;
-    } catch (error) {
-        console.error("Error loading products:", error);
-        return "Error loading product data. Please check available products later.";
-    }
-}
-
-export async function POST(req: Request) {
-    const { messages } = await req.json();
-
-    const productContext = getProductContext();
+        productContext = JSON.stringify(minimized);
+    } catch(e) { console.error("Error loading product context", e); }
 
     const systemPrompt = `
     You are an expert AI Fashion Stylist for a premium luxury boutique.
@@ -109,6 +106,22 @@ export async function POST(req: Request) {
                     }
                 }),
             },
+            async onFinish({ text, toolCalls }) {
+                try {
+                    await connectToDatabase();
+                    let aiContent = text;
+                    if (!aiContent && toolCalls?.length) {
+                        aiContent = "Рекомендованы товары: " + toolCalls.map((t: any) => t.args?.products?.map((p:any) => p.title).join(', ')).filter(Boolean).join('; ');
+                    }
+                    if (aiContent) {
+                        await Chat.create({
+                            userId: (session.user as any).id,
+                            role: 'assistant',
+                            content: aiContent
+                        });
+                    }
+                } catch(e) { console.error("Error saving AI message", e); }
+            }
         });
 
         // Check result methods for debugging

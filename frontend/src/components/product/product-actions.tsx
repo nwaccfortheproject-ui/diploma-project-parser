@@ -3,6 +3,9 @@
 import { Button } from "@/components/ui/button";
 import { useStylist } from "@/context/style-context";
 import { Shirt } from "lucide-react";
+import { useState } from "react";
+import { useSession } from "next-auth/react";
+import { AuthDialog } from "@/components/auth/auth-dialog";
 
 interface ProductActionsProps {
     product: any; // Type strictly if possible
@@ -10,6 +13,8 @@ interface ProductActionsProps {
 
 export function ProductActions({ product }: ProductActionsProps) {
     const { openTryOn } = useStylist();
+    const { data: session } = useSession();
+    const [authDialogOpen, setAuthDialogOpen] = useState(false);
 
     return (
         <div className="space-y-4 mb-8">
@@ -20,7 +25,13 @@ export function ProductActions({ product }: ProductActionsProps) {
             <Button
                 variant="default"
                 className="w-full h-12 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 transition-opacity"
-                onClick={() => openTryOn(product)}
+                onClick={() => {
+                    if (!session) {
+                        setAuthDialogOpen(true);
+                    } else {
+                        openTryOn(product);
+                    }
+                }}
             >
                 <Shirt className="mr-2 h-5 w-5" />
                 Примерить с AI Стилистом
@@ -31,6 +42,8 @@ export function ProductActions({ product }: ProductActionsProps) {
                     Открыть в магазине
                 </a>
             </Button>
+
+            <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
         </div>
     );
 }

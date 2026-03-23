@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, ShoppingBag, Star, TrendingUp } from 'lucide-react';
 import { AIFeatureSection } from '@/components/home/ai-feature-section';
+import { UserMenu } from '@/components/auth/user-menu';
 
 export default function Home() {
   return (
@@ -20,7 +21,8 @@ export default function Home() {
             <Link href="/products" className="hover:text-blue-600 transition-colors">Аксессуары</Link>
             <Link href="/products" className="hover:text-blue-600 transition-colors">Распродажа</Link>
           </nav>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
+            <UserMenu />
             <Link href="/products">
               <Button>Купить сейчас</Button>
             </Link>

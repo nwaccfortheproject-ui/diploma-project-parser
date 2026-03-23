@@ -86,7 +86,7 @@ export function StylistProvider({ children }: { children: ReactNode }) {
             setGenerationProgress(100);
 
             if (data.type === 'image' && data.result) {
-                const imageUrl = `data:image/png;base64,${data.result}`;
+                const imageUrl = data.result;
                 setLastGeneratedImage(imageUrl);
                 // Optionally handle text advice if needed
             } else if (data.error) {

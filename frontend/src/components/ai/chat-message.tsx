@@ -40,7 +40,7 @@ export function ChatMessage({ message, onTryOn }: { message: any, onTryOn?: (pro
                             (() => {
                                 const parts = message.content.split(':::IMAGE_DATA:::');
                                 const textPart = parts[0];
-                                const imagePart = parts[1];
+                                const imagePart = parts[1]?.trim();
                                 return (
                                     <>
                                         <ReactMarkdown
@@ -51,8 +51,20 @@ export function ChatMessage({ message, onTryOn }: { message: any, onTryOn?: (pro
                                             {textPart}
                                         </ReactMarkdown>
                                         {imagePart && (
-                                            <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
+                                            <div className="mt-2 rounded-lg overflow-hidden border border-gray-200 group relative">
                                                 <img src={imagePart} alt="Generated Try-On" className="w-full h-auto object-cover" />
+                                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <a 
+                                                        href={imagePart} 
+                                                        download="smartbuy-tryon.jpg" 
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="bg-white/90 backdrop-blur-sm text-gray-800 p-2 rounded-lg shadow-sm flex items-center gap-1.5 text-xs font-medium hover:bg-white"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                                                        Скачать
+                                                    </a>
+                                                </div>
                                             </div>
                                         )}
                                     </>
