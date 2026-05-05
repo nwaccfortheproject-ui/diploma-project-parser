@@ -1,35 +1,24 @@
 import { notFound } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { ProductGallery } from '@/components/product-gallery';
 import { Product } from '@/types';
-import fs from 'fs';
-import path from 'path';
+import { Types } from 'mongoose';
+import connectToDatabase from '@/lib/db';
+import ProductModel from '@/models/Product';
 import { ProductActions } from '@/components/product/product-actions';
 
-// This is a simplified way to fetch a single product from the JSON file.
-// In a real app, you would use a database or an API client.
 async function getProduct(id: string): Promise<Product | undefined> {
     try {
-        const filePath = path.join(process.cwd(), 'src/data/products.json');
-        const fileContents = fs.readFileSync(filePath, 'utf8');
-        const products: Product[] = JSON.parse(fileContents);
+        await connectToDatabase();
 
-        // We need to regenerate the ID to find the match
-        // Or better, just loop and check
-        return products.find(p => {
-            let hash = 0;
-            for (let i = 0; i < p.url.length; i++) {
-                const char = p.url.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash;
-            }
-            const hexId = Math.abs(hash).toString(16);
-            return hexId === id;
-        });
-    } catch (e) {
+        const query = Types.ObjectId.isValid(id) ? { _id: id } : { article: id };
+        const doc = await ProductModel.findOne(query).lean<Record<string, unknown> & { _id: Types.ObjectId }>();
+        if (!doc) return undefined;
+
+        const { _id, __v: _v, ...rest } = doc;
+        return { ...rest, id: _id.toString() } as Product;
+    } catch {
         return undefined;
     }
 }
