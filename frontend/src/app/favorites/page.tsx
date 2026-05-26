@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Heart, ShoppingBag } from 'lucide-react';
 import { Product } from '@/types';
 import { AuthDialog } from '@/components/auth/auth-dialog';
+import { CartLink } from '@/components/cart/cart-link';
 
 export default function FavoritesPage() {
     const { status } = useSession();
@@ -51,12 +52,15 @@ export default function FavoritesPage() {
                         <ShoppingBag className="h-6 w-6 text-blue-600" />
                         <span>SMARTBUY</span>
                     </Link>
-                    <Link href="/products">
-                        <Button variant="outline" className="gap-2">
-                            <ArrowLeft className="h-4 w-4" />
-                            К каталогу
-                        </Button>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <CartLink />
+                        <Link href="/products">
+                            <Button variant="outline" className="gap-2">
+                                <ArrowLeft className="h-4 w-4" />
+                                К каталогу
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
             </header>
 

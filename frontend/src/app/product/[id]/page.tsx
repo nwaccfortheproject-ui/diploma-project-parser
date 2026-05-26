@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { ProductGallery } from '@/components/product-gallery';
 import { Product } from '@/types';
 import { Types } from 'mongoose';
 import connectToDatabase from '@/lib/db';
 import ProductModel from '@/models/Product';
 import { ProductActions } from '@/components/product/product-actions';
+import { UserMenu } from '@/components/auth/user-menu';
+import { ShoppingBag } from 'lucide-react';
 
 async function getProduct(id: string): Promise<Product | undefined> {
     try {
@@ -35,10 +36,19 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
     return (
         <div className="min-h-screen bg-white">
+            <header className="sticky top-0 z-40 w-full border-b bg-white/80 backdrop-blur-md">
+                <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                    <Link href="/" className="flex items-center gap-2 font-bold tracking-tighter text-lg">
+                        <ShoppingBag className="h-5 w-5 text-blue-600" />
+                        <span>SMARTBUY</span>
+                    </Link>
+                    <UserMenu />
+                </div>
+            </header>
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <div className="mb-6">
-                    <Link href="/" className="text-sm text-gray-500 hover:text-black">
-                        ← Back to Catalog
+                    <Link href="/products" className="text-sm text-gray-500 hover:text-black">
+                        ← Назад к каталогу
                     </Link>
                 </div>
 
@@ -62,20 +72,6 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                         </div>
 
 
-
-                        {/* Sizes */}
-                        {product.sizes.length > 0 && (
-                            <div className="mb-8">
-                                <h3 className="text-sm font-medium text-gray-900 mb-4">Select Size</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {product.sizes.map(size => (
-                                        <Button key={size} variant="outline" className="min-w-[3rem]">
-                                            {size}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
                         <ProductActions product={product} />
 

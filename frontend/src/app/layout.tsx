@@ -4,6 +4,7 @@ import "./globals.css";
 import { StylistChat } from "@/components/ai/stylist-chat";
 import { StylistProvider } from "@/context/style-context";
 import { LikesProvider } from "@/context/likes-context";
+import { CartProvider } from "@/context/cart-context";
 import NextAuthProvider from "@/components/auth/NextAuthProvider";
 import { PWARegister } from "@/components/pwa-register";
 
@@ -70,12 +71,14 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <NextAuthProvider>
-          <LikesProvider>
-            <StylistProvider>
-              {children}
-              <StylistChat />
-            </StylistProvider>
-          </LikesProvider>
+          <CartProvider>
+            <LikesProvider>
+              <StylistProvider>
+                {children}
+                <StylistChat />
+              </StylistProvider>
+            </LikesProvider>
+          </CartProvider>
         </NextAuthProvider>
         <PWARegister />
       </body>

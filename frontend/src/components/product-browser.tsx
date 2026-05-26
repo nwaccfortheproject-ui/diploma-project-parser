@@ -19,6 +19,9 @@ import {
 } from "@/components/ui/pagination"
 import { Search, Filter, Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/use-debounce';
+import { UserMenu } from '@/components/auth/user-menu';
+import Link from 'next/link';
+import { ShoppingBag } from 'lucide-react';
 
 export function ProductBrowser() {
     // State
@@ -164,6 +167,10 @@ export function ProductBrowser() {
             {/* Header / Search Bar area */}
             <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b px-4 py-4 mb-6">
                 <div className="max-w-7xl mx-auto flex items-center gap-4">
+                    <Link href="/" className="flex items-center gap-2 font-bold tracking-tighter text-lg flex-shrink-0">
+                        <ShoppingBag className="h-5 w-5 text-blue-600" />
+                        <span className="hidden sm:inline">SMARTBUY</span>
+                    </Link>
                     <div className="relative flex-1 max-w-lg">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
@@ -197,6 +204,10 @@ export function ProductBrowser() {
                                 )}
                             </SheetContent>
                         </Sheet>
+                    </div>
+
+                    <div className="ml-auto flex items-center gap-2">
+                        <UserMenu />
                     </div>
                 </div>
             </div>
