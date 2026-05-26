@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { StylistChat } from "@/components/ai/stylist-chat";
 import { StylistProvider } from "@/context/style-context";
+import { LikesProvider } from "@/context/likes-context";
 import NextAuthProvider from "@/components/auth/NextAuthProvider";
 import { PWARegister } from "@/components/pwa-register";
 
@@ -69,10 +70,12 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <NextAuthProvider>
-          <StylistProvider>
-            {children}
-            <StylistChat />
-          </StylistProvider>
+          <LikesProvider>
+            <StylistProvider>
+              {children}
+              <StylistChat />
+            </StylistProvider>
+          </LikesProvider>
         </NextAuthProvider>
         <PWARegister />
       </body>

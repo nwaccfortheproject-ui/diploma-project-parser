@@ -6,9 +6,11 @@ import { Shirt } from "lucide-react";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { AuthDialog } from "@/components/auth/auth-dialog";
+import { LikeButton } from "@/components/product/like-button";
+import { Product } from "@/types";
 
 interface ProductActionsProps {
-    product: any; // Type strictly if possible
+    product: Product;
 }
 
 export function ProductActions({ product }: ProductActionsProps) {
@@ -18,9 +20,14 @@ export function ProductActions({ product }: ProductActionsProps) {
 
     return (
         <div className="space-y-4 mb-8">
-            <Button className="w-full h-12 text-lg">
-                Добавить в корзину
-            </Button>
+            <div className="flex gap-3">
+                <Button className="flex-1 h-12 text-lg">
+                    Добавить в корзину
+                </Button>
+                {product.id && (
+                    <LikeButton productId={product.id} variant="inline" className="flex-shrink-0" />
+                )}
+            </div>
 
             <Button
                 variant="default"

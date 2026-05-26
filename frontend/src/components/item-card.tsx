@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { Product } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { LikeButton } from '@/components/product/like-button';
 
 interface ProductCardProps {
     product: Product;
@@ -31,8 +32,11 @@ export function ProductCard({ product }: ProductCardProps) {
                     e.dataTransfer.setData('application/json', JSON.stringify(data));
                     e.dataTransfer.effectAllowed = 'copy';
                 }}
-                className="cursor-grab active:cursor-grabbing"
+                className="cursor-grab active:cursor-grabbing relative"
             >
+                {product.id && (
+                    <LikeButton productId={product.id} />
+                )}
                 <Link href={`/product/${product.id}`} className="block relative aspect-[3/4] overflow-hidden rounded-xl bg-gray-100 mb-3">
                     {/* Badges */}
                     {hasDiscount && (
