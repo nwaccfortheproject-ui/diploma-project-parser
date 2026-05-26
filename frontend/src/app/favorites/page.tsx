@@ -6,10 +6,11 @@ import { useSession } from 'next-auth/react';
 import { ProductCard } from '@/components/item-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Heart, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Heart } from 'lucide-react';
 import { Product } from '@/types';
 import { AuthDialog } from '@/components/auth/auth-dialog';
 import { CartLink } from '@/components/cart/cart-link';
+import { Logo } from '@/components/logo';
 
 export default function FavoritesPage() {
     const { status } = useSession();
@@ -48,9 +49,8 @@ export default function FavoritesPage() {
         <div className="min-h-screen bg-gray-50/50">
             <header className="sticky top-0 z-40 w-full border-b bg-white/80 backdrop-blur-md">
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                    <Link href="/" className="flex items-center gap-2 font-bold text-xl tracking-tighter">
-                        <ShoppingBag className="h-6 w-6 text-blue-600" />
-                        <span>SMARTBUY</span>
+                    <Link href="/" className="flex items-center" aria-label="SMARTBUY">
+                        <Logo size={44} priority />
                     </Link>
                     <div className="flex items-center gap-2">
                         <CartLink />

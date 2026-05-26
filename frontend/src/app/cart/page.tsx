@@ -4,8 +4,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useCart, formatKzt } from '@/context/cart-context';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Minus, Plus, ShoppingBag, ShoppingCart, Trash2 } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
 import { UserMenu } from '@/components/auth/user-menu';
+import { Logo } from '@/components/logo';
 
 const DELIVERY_FEE = 1990;
 
@@ -18,9 +19,8 @@ export default function CartPage() {
         <div className="min-h-screen bg-gray-50/50">
             <header className="sticky top-0 z-40 w-full border-b bg-white/80 backdrop-blur-md">
                 <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-                    <Link href="/" className="flex items-center gap-2 font-bold tracking-tighter text-lg">
-                        <ShoppingBag className="h-5 w-5 text-blue-600" />
-                        <span>SMARTBUY</span>
+                    <Link href="/" className="flex items-center" aria-label="SMARTBUY">
+                        <Logo size={44} priority />
                     </Link>
                     <UserMenu />
                 </div>

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, ShoppingBag, Star, TrendingUp } from 'lucide-react';
 import { AIFeatureSection } from '@/components/home/ai-feature-section';
 import { UserMenu } from '@/components/auth/user-menu';
+import { Logo } from '@/components/logo';
 
 export default function Home() {
   return (
@@ -11,10 +12,9 @@ export default function Home() {
       {/* Navbar Placeholder (Ideally this would be a real component) */}
       <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-bold text-xl tracking-tighter">
-            <ShoppingBag className="h-6 w-6 text-blue-600" />
-            <span>SMARTBUY</span>
-          </div>
+          <Link href="/" className="flex items-center" aria-label="SMARTBUY">
+            <Logo size={48} priority />
+          </Link>
           <nav className="hidden md:flex gap-6 text-sm font-medium text-gray-600">
             <Link href="/products" className="hover:text-blue-600 transition-colors">Мужское</Link>
             <Link href="/products" className="hover:text-blue-600 transition-colors">Женское</Link>
