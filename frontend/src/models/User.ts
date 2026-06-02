@@ -10,11 +10,11 @@ export interface IUser extends Document {
 
 const UserSchema: Schema = new Schema(
   {
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: false }, // optional for OAuth later
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    password: { type: String, required: false },
     name: { type: String, required: false },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'auth_users' }
 );
 
 export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
